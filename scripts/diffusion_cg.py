@@ -11,7 +11,7 @@ VERSION = 'v0.1.3'
 # luminance = 0.2126 * R + 0.7152 * G + 0.0722 * B
 # LUTS: [-K, -M, C, Y]
 
-LUTS = [0.0, -0.5152, 0.0126, -0.1278]
+LUTS = [0.0, 0.0, 0.0, 0.0]
 
 
 # https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/configs/v1-inference.yaml#L17
