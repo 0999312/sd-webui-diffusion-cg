@@ -38,8 +38,9 @@ def normalize_tensor(x, r):
 original_callback = KDiffusionSampler.callback_state
 
 
-def center_callback(self: "DiffusionCG", d):
-    if not self.options.is_enabled():
+def center_callback(self, d):
+    options: "DiffusionCG.CGOptions" = self.diffcg_options
+    if not options.is_enabled():
         return original_callback(self, d)
 
     batchSize = d[self.diffcg_tensor].size(0)
@@ -47,10 +48,10 @@ def center_callback(self: "DiffusionCG", d):
         for channel in range(4):
 
             if self.options.enable_centering:
-                d[self.diffcg_tensor][image_num][channel] += self.options.channel_shift * (
+                d[self.diffcg_tensor][image_num][channel] += options.channel_shift * (
                         LUTS[channel] - d[self.diffcg_tensor][image_num][channel].mean())
 
-            if self.options.enable_normalization and (d['i'] + 1) >= self.diffcg_last_step - 1:
+            if options.enable_normalization and (d['i'] + 1) >= self.diffcg_last_step - 1:
                 d[self.diffcg_tensor][image_num][channel] = normalize_tensor(d[self.diffcg_tensor][image_num][channel],
                                                                              DYNAMIC_RANGE[channel])
 
