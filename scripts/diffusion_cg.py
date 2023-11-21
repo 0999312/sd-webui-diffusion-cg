@@ -34,6 +34,7 @@ def normalize_tensor(x, r):
 
     return x + delta
 
+
 # Maximize/normalize tensor
 def maximize_tensor(input_tensor, boundary=4, channels=[0, 1, 2]):
     min_val = input_tensor.min()
@@ -43,6 +44,7 @@ def maximize_tensor(input_tensor, boundary=4, channels=[0, 1, 2]):
     input_tensor[channels] *= normalization_factor
 
     return input_tensor
+
 
 original_callback = KDiffusionSampler.callback_state
 
@@ -64,6 +66,8 @@ def center_callback(self, d):
             # if options.enable_normalization and (d['i'] + 1) >= self.diffcg_last_step - 1:
             #     d[self.diffcg_tensor][image_num][channel] = normalize_tensor(d[self.diffcg_tensor][image_num][channel],
             #                                                                  DYNAMIC_RANGE[channel])
+        if options.enable_centering:
+            d[self.diffcg_tensor][image_num] -= options.full_tensor_shift * d[self.diffcg_tensor][image_num].mean()
         if options.enable_normalization and (d['i'] + 1) >= self.diffcg_last_step - 1:
             d[self.diffcg_tensor][image_num] = maximize_tensor(d[self.diffcg_tensor][image_num])
     return original_callback(self, d)
