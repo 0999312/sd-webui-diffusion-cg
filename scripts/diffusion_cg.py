@@ -1,18 +1,17 @@
+from dataclasses import dataclass
+
 from modules.sd_samplers_kdiffusion import KDiffusionSampler
 from modules import script_callbacks
 import modules.scripts as scripts
 from modules import shared
 import gradio as gr
 
-
 VERSION = 'v0.1.3'
-
 
 # luminance = 0.2126 * R + 0.7152 * G + 0.0722 * B
 # LUTS: [-K, -M, C, Y]
 
 LUTS = [0.0, 0.0, 0.0, 0.0]
-
 
 # https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/configs/v1-inference.yaml#L17
 # (1.0 / 0.18215) / 2 = 2.74499039253
@@ -38,26 +37,42 @@ def normalize_tensor(x, r):
 
 original_callback = KDiffusionSampler.callback_state
 
-def center_callback(self, d):
-    if not self.diffcg_enable:
+
+def center_callback(self: "DiffusionCG", d):
+    if not self.options.is_enabled():
         return original_callback(self, d)
 
     batchSize = d[self.diffcg_tensor].size(0)
-    for b in range(batchSize):
-        for i in range(4):
+    for image_num in range(batchSize):
+        for channel in range(4):
 
-            if self.diffcg_recenter:
-                d[self.diffcg_tensor][b][i] += (LUTS[i] - d[self.diffcg_tensor][b][i].mean())
+            if self.options.enable_centering:
+                d[self.diffcg_tensor][image_num][channel] += self.options.channel_shift * (
+                        LUTS[channel] - d[self.diffcg_tensor][image_num][channel].mean())
 
-            if self.diffcg_normalize and (d['i'] + 1) >= self.diffcg_last_step - 1:
-                d[self.diffcg_tensor][b][i] = normalize_tensor(d[self.diffcg_tensor][b][i], DYNAMIC_RANGE[i])
+            if self.options.enable_normalization and (d['i'] + 1) >= self.diffcg_last_step - 1:
+                d[self.diffcg_tensor][image_num][channel] = normalize_tensor(d[self.diffcg_tensor][image_num][channel],
+                                                                             DYNAMIC_RANGE[channel])
 
     return original_callback(self, d)
+
 
 KDiffusionSampler.callback_state = center_callback
 
 
 class DiffusionCG(scripts.Script):
+    @dataclass
+    class CGOptions:
+        enable_centering: bool
+        enable_normalization: bool
+
+        channel_shift: float
+        full_tensor_shift: float
+
+        def is_enabled(self):
+            return self.enable_normalization or self.enable_centering
+
+    options = CGOptions
 
     def title(self):
         return "DiffusionCG"
@@ -74,22 +89,34 @@ class DiffusionCG(scripts.Script):
                     gr.Markdown('<h3 align="center">Recenter</h3>')
                     enableC = gr.Checkbox(label="Enable")
 
+                    channel_shift = gr.Slider(maximum=2.0)
+                    full_tensor_shift = gr.Slider(maximum=2.0)
+
                 with gr.Group():
                     gr.Markdown('<h3 align="center">Normalization</h3>')
                     enableN = gr.Checkbox(label="Enable")
 
-        return [enableG, enableC, enableN]
+        return [enableG, enableC, enableN, channel_shift, full_tensor_shift]
 
     def before_hr(self, p, *args):
         KDiffusionSampler.diffcg_normalize = False
 
-    def process(self, p, enableG:bool, enableC:bool, enableN:bool):
+    def process(self, p, enableG: bool, enableC: bool, enableN: bool, channel_shift: float, full_tensor_shift: float):
+        self.options = DiffusionCG.CGOptions(
+            enable_centering=enableC,
+            enable_normalization=enableN,
+            channel_shift=channel_shift,
+            full_tensor_shift=full_tensor_shift
+        )
+
+        KDiffusionSampler.diffcg_options = self.options
         KDiffusionSampler.diffcg_enable = enableG
         KDiffusionSampler.diffcg_recenter = enableC
         KDiffusionSampler.diffcg_normalize = enableN
         KDiffusionSampler.diffcg_tensor = 'x' if p.sampler_name.strip() == 'Euler' else 'denoised'
 
-        if not hasattr(p, 'enable_hr') and hasattr(p, 'denoising_strength') and not shared.opts.img2img_fix_steps and p.denoising_strength < 1.0:
+        if not hasattr(p, 'enable_hr') and hasattr(p,
+                                                   'denoising_strength') and not shared.opts.img2img_fix_steps and p.denoising_strength < 1.0:
             KDiffusionSampler.diffcg_last_step = int(p.steps * p.denoising_strength) + 1
         else:
             KDiffusionSampler.diffcg_last_step = p.steps
@@ -97,5 +124,6 @@ class DiffusionCG(scripts.Script):
 
 def restore_callback():
     KDiffusionSampler.callback_state = original_callback
+
 
 script_callbacks.on_script_unloaded(restore_callback)
