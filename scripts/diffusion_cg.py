@@ -47,7 +47,7 @@ def center_callback(self, d):
     for image_num in range(batchSize):
         for channel in range(4):
 
-            if self.options.enable_centering:
+            if options.enable_centering:
                 d[self.diffcg_tensor][image_num][channel] += options.channel_shift * (
                         LUTS[channel] - d[self.diffcg_tensor][image_num][channel].mean())
 
