@@ -40,7 +40,7 @@ def maximize_tensor(input_tensor, boundary=4, channels=[0, 1, 2]):
     max_val = input_tensor.max()
 
     normalization_factor = boundary / max(abs(min_val), abs(max_val))
-    input_tensor[0, channels] *= normalization_factor
+    input_tensor[channels] *= normalization_factor
 
     return input_tensor
 
