@@ -64,7 +64,8 @@ def center_callback(self, d):
             # if options.enable_normalization and (d['i'] + 1) >= self.diffcg_last_step - 1:
             #     d[self.diffcg_tensor][image_num][channel] = normalize_tensor(d[self.diffcg_tensor][image_num][channel],
             #                                                                  DYNAMIC_RANGE[channel])
-        d[self.diffcg_tensor][image_num] = maximize_tensor(d[self.diffcg_tensor][image_num])
+        if options.enable_normalization and (d['i'] + 1) >= self.diffcg_last_step - 1:
+            d[self.diffcg_tensor][image_num] = maximize_tensor(d[self.diffcg_tensor][image_num])
     return original_callback(self, d)
 
 
