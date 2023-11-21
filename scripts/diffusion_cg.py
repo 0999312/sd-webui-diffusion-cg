@@ -34,12 +34,22 @@ def normalize_tensor(x, r):
 
     return x + delta
 
+# Maximize/normalize tensor
+def maximize_tensor(input_tensor, boundary=4, channels=[0, 1, 2]):
+    min_val = input_tensor.min()
+    max_val = input_tensor.max()
+
+    normalization_factor = boundary / max(abs(min_val), abs(max_val))
+    input_tensor[0, channels] *= normalization_factor
+
+    return input_tensor
 
 original_callback = KDiffusionSampler.callback_state
 
 
 def center_callback(self, d):
     options: "DiffusionCG.CGOptions" = self.diffcg_options
+
     if not options.is_enabled():
         return original_callback(self, d)
 
@@ -51,10 +61,10 @@ def center_callback(self, d):
                 d[self.diffcg_tensor][image_num][channel] += options.channel_shift * (
                         LUTS[channel] - d[self.diffcg_tensor][image_num][channel].mean())
 
-            if options.enable_normalization and (d['i'] + 1) >= self.diffcg_last_step - 1:
-                d[self.diffcg_tensor][image_num][channel] = normalize_tensor(d[self.diffcg_tensor][image_num][channel],
-                                                                             DYNAMIC_RANGE[channel])
-
+            # if options.enable_normalization and (d['i'] + 1) >= self.diffcg_last_step - 1:
+            #     d[self.diffcg_tensor][image_num][channel] = normalize_tensor(d[self.diffcg_tensor][image_num][channel],
+            #                                                                  DYNAMIC_RANGE[channel])
+        d[self.diffcg_tensor][image_num] = maximize_tensor(d[self.diffcg_tensor][image_num])
     return original_callback(self, d)
 
 
@@ -90,8 +100,8 @@ class DiffusionCG(scripts.Script):
                     gr.Markdown('<h3 align="center">Recenter</h3>')
                     enableC = gr.Checkbox(label="Enable")
 
-                    channel_shift = gr.Slider(maximum=2.0)
-                    full_tensor_shift = gr.Slider(maximum=2.0)
+                    channel_shift = gr.Slider(label="Channel shift", maximum=2.0)
+                    full_tensor_shift = gr.Slider(label="Full tensor shift", maximum=2.0)
 
                 with gr.Group():
                     gr.Markdown('<h3 align="center">Normalization</h3>')
@@ -100,7 +110,7 @@ class DiffusionCG(scripts.Script):
         return [enableG, enableC, enableN, channel_shift, full_tensor_shift]
 
     def before_hr(self, p, *args):
-        KDiffusionSampler.diffcg_normalize = False
+        KDiffusionSampler.diffcg_options.enable_normalzation = False
 
     def process(self, p, enableG: bool, enableC: bool, enableN: bool, channel_shift: float, full_tensor_shift: float):
         self.options = DiffusionCG.CGOptions(
